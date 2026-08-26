@@ -6,7 +6,7 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0"
 		/>
-		<title>Player Chooser</title>
+		<title>Finger Chooser & Team Picker</title>
 		<link rel="manifest" href="src/manifest.webmanifest" />
 		<link rel="icon" sizes="48x48" href="src/images/logo-48.png" />
 		<link rel="icon" sizes="96x96" href="src/images/logo-96.png" />
@@ -18,32 +18,49 @@
 			name="apple-mobile-web-app-status-bar-style"
 			content="black-translucent"
 		/>
-		<meta name="theme-color" content="#ff0739" />
+		<meta name="theme-color" content="#0d0e15" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap"
+			rel="stylesheet"
+		/>
 		<link rel="stylesheet" href="src/index.css" />
 		<script type="module" src="src/index.js"></script>
 	</head>
 	<body>
 		<canvas id="board"></canvas>
-		<p id="description">
-			Make all players put one finger on the screen. After 2 seconds one
-			player is chosen at random.
-		</p>
-		<div id="controls">
-			<button id="team-mode-toggle">Team Mode</button>
-			<div id="team-count-label">
-				Teams: <span id="team-count">2</span>
-				<button id="team-minus">-</button>
-				<button id="team-plus">+</button>
-			</div>
+
+		<div id="instruction-card">
+			<div class="glow-disc"></div>
+			<p id="description">
+				Place your fingers on the screen to start.
+			</p>
 		</div>
-		<div
-			id="live-region"
-			aria-live="assertive"
-			class="visually-hidden"
-		></div>
-		<p id="version"></p>
-		<p id="update-available" hidden>
-			Update available. <a href="">Reload</a> to apply.
-		</p>
+
+		<header id="controls">
+			<button id="team-mode-toggle" aria-label="Toggle Team Mode">
+				<span class="dot"></span>
+				<span class="btn-text">Team Mode</span>
+			</button>
+
+			<div id="team-count-label" aria-label="Adjust Team Count">
+				<span class="label-title">Teams</span>
+				<div class="stepper">
+					<button id="team-minus" aria-label="Decrease Teams">−</button>
+					<span id="team-count">2</span>
+					<button id="team-plus" aria-label="Increase Teams">+</button>
+				</div>
+			</div>
+		</header>
+
+		<div id="live-region" aria-live="assertive" class="visually-hidden"></div>
+
+		<footer id="footer-info">
+			<p id="version"></p>
+			<div id="update-available" hidden>
+				Update ready. <a href="#" onclick="location.reload()">Reload</a>
+			</div>
+		</footer>
 	</body>
 </html>
