@@ -181,29 +181,18 @@ const drawPlayer = (player) => {
 	const pulse = (Math.sin((now - player.spawnTime) / 200) + 1) / 2;
 	const outerRadius = (52 + pulse * 6) * dpr;
 
+	// Outer Ring
 	ctx.beginPath();
 	ctx.strokeStyle = mainColor;
 	ctx.lineWidth = 4 * dpr;
 	ctx.arc(px, py, outerRadius, 0, 2 * Math.PI);
 	ctx.stroke();
 
+	// Solid Inner Disc (No dots or text)
 	ctx.beginPath();
 	ctx.fillStyle = mainColor;
 	ctx.arc(px, py, 38 * dpr, 0, 2 * Math.PI);
 	ctx.fill();
-
-	ctx.beginPath();
-	ctx.fillStyle = "#ffffff";
-	ctx.arc(px, py, 14 * dpr, 0, 2 * Math.PI);
-	ctx.fill();
-
-	if (teamMode && teamsAssigned && player.team !== undefined) {
-		ctx.fillStyle = "#000000";
-		ctx.font = `800 ${22 * dpr}px 'Plus Jakarta Sans', sans-serif`;
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		ctx.fillText(`${player.team + 1}`, px, py);
-	}
 };
 
 const draw = (() => {
@@ -422,7 +411,7 @@ const updateTeamModeUI = () => {
 	} else {
 		teamModeToggle.classList.remove("active");
 		teamCountLabel.classList.remove("visible");
-		description.textContent = `Place 2 or more fingers on the screen to choose a winner.`;
+		description.textContent = `Place your fingers on the screen to choose a winner.`;
 	}
 };
 
