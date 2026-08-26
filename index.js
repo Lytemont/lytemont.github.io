@@ -1,9 +1,11 @@
 const MIN_PLAYERS = 2;
-const CHOOSE_DELAY_MS = 2000;
+const CHOOSE_DELAY_MS = 2200;
 const RESET_DELAY_MS = 1000;
 
+// DOM Elements
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
+const instructionCard = document.getElementById("instruction-card");
 const description = document.getElementById("description");
 const ariaLive = document.getElementById("live-region");
 const version = document.getElementById("version");
@@ -14,22 +16,99 @@ const teamCountSpan = document.getElementById("team-count");
 const teamMinusBtn = document.getElementById("team-minus");
 const teamPlusBtn = document.getElementById("team-plus");
 
+// State
 const players = new Map();
-let chosenPlayer;
-const chosenPlayerAnimation = {
+let chosenPlayerId = undefined;
+const chosenAnimation = {
 	startTime: 0,
-	startValue: 0,
+	startRadius: 0,
 };
 
 let teamMode = false;
 let teamCount = 2;
 const teams = new Map();
 let teamsAssigned = false;
+let dpr = window.devicePixelRatio || 1;
 
+// Sound Effects Synthesizer (Web Audio API)
+class SoundFX {
+	constructor() {
+		this.ctx = null;
+	}
+
+	init() {
+		if (!this.ctx) {
+			const AudioContext = window.AudioContext || window.webkitAudioContext;
+			if (AudioContext) {
+				this.ctx = new AudioContext();
+			}
+		}
+		if (this.ctx && this.ctx.state === "suspended") {
+			this.ctx.resume();
+		}
+	}
+
+	touch() {
+		this.init();
+		if (!this.ctx) return;
+		const osc = this.ctx.createOscillator();
+		const gain = this.ctx.createGain();
+		osc.type = "sine";
+		osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+		osc.frequency.exponentialRampToValueAtTime(560, this.ctx.currentTime + 0.08);
+		gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+		gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+		osc.connect(gain);
+		gain.connect(this.ctx.destination);
+		osc.start();
+		osc.stop(this.ctx.currentTime + 0.08);
+	}
+
+	win() {
+		this.init();
+		if (!this.ctx) return;
+		const now = this.ctx.currentTime;
+		const chords = [523.25, 659.25, 783.99, 1046.5]; // C Major
+		chords.forEach((freq, idx) => {
+			const osc = this.ctx.createOscillator();
+			const gain = this.ctx.createGain();
+			osc.type = "triangle";
+			osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+			gain.gain.setValueAtTime(0.25, now + idx * 0.04);
+			gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.6);
+			osc.connect(gain);
+			gain.connect(this.ctx.destination);
+			osc.start(now + idx * 0.04);
+			osc.stop(now + idx * 0.04 + 0.6);
+		});
+	}
+
+	team() {
+		this.init();
+		if (!this.ctx) return;
+		const now = this.ctx.currentTime;
+		[440, 880].forEach((freq, idx) => {
+			const osc = this.ctx.createOscillator();
+			const gain = this.ctx.createGain();
+			osc.type = "sine";
+			osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+			gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+			gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
+			osc.connect(gain);
+			gain.connect(this.ctx.destination);
+			osc.start(now + idx * 0.08);
+			osc.stop(now + idx * 0.08 + 0.3);
+		});
+	}
+}
+
+const sfx = new SoundFX();
+
+// Accessibility Logging
 const ariaLiveLog = (msg) => {
-	const element = document.createElement("div");
-	element.textContent = msg;
-	ariaLive.append(element);
+	const el = document.createElement("div");
+	el.textContent = msg;
+	ariaLive.append(el);
 };
 
 const ariaLiveReset = () => {
@@ -37,141 +116,177 @@ const ariaLiveReset = () => {
 	ariaLiveLog("Reset");
 };
 
+// Canvas Resolution Handling
 const resizeCanvas = () => {
-	canvas.width = Math.floor(window.innerWidth);
-	canvas.height = Math.floor(window.innerHeight);
+	dpr = window.devicePixelRatio || 1;
+	canvas.width = Math.floor(window.innerWidth * dpr);
+	canvas.height = Math.floor(window.innerHeight * dpr);
+	draw();
 };
 window.addEventListener("resize", resizeCanvas);
-resizeCanvas();
 
-const drawPlayer = (player) => {
-	const playerColor = teamMode && !teamsAssigned ? '#666' :
-		teamMode ? teamColor(player.color) : color(player.color);
-	ctx.beginPath();
-	ctx.strokeStyle = playerColor;
-	ctx.lineWidth = 10;
-	ctx.arc(player.x, player.y, 50, 0, 2 * Math.PI);
-	ctx.stroke();
-	ctx.beginPath();
-	ctx.fillStyle = playerColor;
-	ctx.arc(player.x, player.y, 35, 0, 2 * Math.PI);
-	ctx.fill();
+// Color Palettes
+const getIndividualColor = (index, alpha = 1) =>
+	`hsla(${(index * 137.5 + 340) % 360}, 95%, 58%, ${alpha})`;
+
+const teamPalette = [
+	{ hue: 345, hex: "#ff2a6d" }, // Neon Red/Pink
+	{ hue: 195, hex: "#05d9e8" }, // Neon Cyan
+	{ hue: 145, hex: "#00ff87" }, // Emerald Neon
+	{ hue: 45,  hex: "#ffb800" }, // Amber Glow
+	{ hue: 275, hex: "#b537f2" }, // Violet Glow
+	{ hue: 25,  hex: "#ff6c00" }, // Orange
+	{ hue: 170, hex: "#00f0b5" }, // Mint Teal
+	{ hue: 315, hex: "#ff00a0" }, // Magenta
+];
+
+const getTeamColor = (teamIndex, alpha = 1) => {
+	const col = teamPalette[teamIndex % teamPalette.length];
+	return `hsla(${col.hue}, 100%, 55%, ${alpha})`;
+};
+
+const pickUnusedColor = () => {
+	const used = Array.from(players.values()).map((p) => p.color);
+	let c = 0;
+	while (used.includes(c)) c++;
+	return c;
 };
 
 const easeOutQuint = (t) => 1 + --t * t * t * t * t;
 
-const draw = (function () {
-	const draw = () => {
-		// Reset
+// Render Functions
+const drawPlayerGlow = (x, y, radius, color, alpha = 0.4) => {
+	const grad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 2);
+	grad.addColorStop(0, color.replace(/[\d.]+\)$/, `${alpha})`));
+	grad.addColorStop(1, color.replace(/[\d.]+\)$/, "0)"));
+	ctx.fillStyle = grad;
+	ctx.beginPath();
+	ctx.arc(x, y, radius * 2, 0, 2 * Math.PI);
+	ctx.fill();
+};
+
+const drawPlayer = (player) => {
+	const px = player.x * dpr;
+	const py = player.y * dpr;
+	const isNeutral = teamMode && !teamsAssigned;
+	const mainColor = isNeutral
+		? "hsla(220, 20%, 65%, 1)"
+		: teamMode
+		? getTeamColor(player.color, 1)
+		: getIndividualColor(player.color, 1);
+
+	// Outer ambient glow
+	drawPlayerGlow(px, py, 60 * dpr, mainColor, 0.45);
+
+	// Outer Pulse Ring
+	const now = Date.now();
+	const pulse = (Math.sin((now - player.spawnTime) / 200) + 1) / 2;
+	const outerRadius = (52 + pulse * 6) * dpr;
+
+	ctx.beginPath();
+	ctx.strokeStyle = mainColor;
+	ctx.lineWidth = 4 * dpr;
+	ctx.arc(px, py, outerRadius, 0, 2 * Math.PI);
+	ctx.stroke();
+
+	// Inner Disc
+	ctx.beginPath();
+	ctx.fillStyle = mainColor;
+	ctx.arc(px, py, 38 * dpr, 0, 2 * Math.PI);
+	ctx.fill();
+
+	// Inner Core Accent
+	ctx.beginPath();
+	ctx.fillStyle = "#ffffff";
+	ctx.arc(px, py, 14 * dpr, 0, 2 * Math.PI);
+	ctx.fill();
+
+	// Team Identifier Number inside the disc
+	if (teamMode && teamsAssigned && player.team !== undefined) {
+		ctx.fillStyle = "#000000";
+		ctx.font = `800 ${22 * dpr}px 'Plus Jakarta Sans', sans-serif`;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillText(`${player.team + 1}`, px, py);
+	}
+};
+
+const draw = (() => {
+	const renderLoop = () => {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-		if (chosenPlayer !== undefined) {
-			// Chosen Player
-			description.hidden = true;
-			const player = players.get(chosenPlayer);
-			drawPlayer(player);
+		if (chosenPlayerId !== undefined) {
+			instructionCard.classList.add("hidden");
+			const player = players.get(chosenPlayerId);
 
-			const { startTime, startValue } = chosenPlayerAnimation;
-			const endValue = 90;
-			const elapsed = Date.now() - startTime;
-			const duration = RESET_DELAY_MS;
-			const t = elapsed / duration;
-			const value =
-				t < 1
-					? startValue - (startValue - endValue) * easeOutQuint(t)
-					: endValue;
+			if (player) {
+				const { startTime, startRadius } = chosenAnimation;
+				const endRadius = 100 * dpr;
+				const elapsed = Date.now() - startTime;
+				const duration = RESET_DELAY_MS;
+				const t = Math.min(1, elapsed / duration);
+				const currentRadius = startRadius - (startRadius - endRadius) * easeOutQuint(t);
 
-			ctx.beginPath();
-			const playerColor = teamMode ? teamColor(player.color) : color(player.color);
-			ctx.fillStyle = playerColor;
-			ctx.rect(0, 0, canvas.width, canvas.height);
-			ctx.arc(player.x, player.y, value, 0, 2 * Math.PI);
-			ctx.fill("evenodd");
+				const px = player.x * dpr;
+				const py = player.y * dpr;
+				const winColor = teamMode
+					? getTeamColor(player.color, 1)
+					: getIndividualColor(player.color, 1);
 
-			return t < 1;
+				// Winning reveal mask
+				ctx.beginPath();
+				ctx.fillStyle = winColor;
+				ctx.rect(0, 0, canvas.width, canvas.height);
+				ctx.arc(px, py, Math.max(0, currentRadius), 0, 2 * Math.PI);
+				ctx.fill("evenodd");
+
+				drawPlayer(player);
+
+				return t < 1;
+			}
+			return false;
 		} else if (players.size > 0) {
-			// All players
-			description.hidden = true;
+			instructionCard.classList.add("hidden");
 			for (const player of players.values()) {
 				drawPlayer(player);
 			}
-
-			return false;
+			return true; // Keep loop active for smooth pulse animations
 		} else {
-			// Help text
-			description.hidden = false;
+			instructionCard.classList.remove("hidden");
 			return false;
 		}
 	};
 
-	let running = false;
+	let animFrame = null;
 	const run = () => {
-		if (draw()) {
-			window.requestAnimationFrame(run);
+		if (renderLoop()) {
+			animFrame = window.requestAnimationFrame(run);
 		} else {
-			running = false;
+			animFrame = null;
 		}
 	};
+
 	return () => {
-		if (!running) {
-			window.requestAnimationFrame(run);
-			running = true;
+		if (!animFrame) {
+			animFrame = window.requestAnimationFrame(run);
 		}
 	};
 })();
 
-const color = (index, alpha = 1) =>
-	`hsla(${index * 222.5 + 348}, 100%, 51.4%, ${alpha})`;
-
-const teamColor = (teamIndex, alpha = 1) => {
-	const colors = [
-		`hsla(348, 100%, 51.4%, ${alpha})`,
-		`hsla(210, 100%, 51.4%, ${alpha})`,
-		`hsla(120, 100%, 51.4%, ${alpha})`,
-		`hsla(60, 100%, 51.4%, ${alpha})`,
-		`hsla(300, 100%, 51.4%, ${alpha})`,
-		`hsla(30, 100%, 51.4%, ${alpha})`,
-		`hsla(180, 100%, 51.4%, ${alpha})`,
-		`hsla(270, 100%, 51.4%, ${alpha})`,
-	];
-	return colors[teamIndex % colors.length];
-};
-
-const pickUnusedColor = () => {
-	const alreadyChosenColors = Array.from(players.values()).map(
-		(p) => p.color
-	);
-	let color = 0;
-	while (alreadyChosenColors.includes(color)) {
-		color++;
-	}
-
-	return color;
-};
-
-const assignPlayerToTeam = (playerId) => {
-	const teamSizes = Array.from({ length: teamCount }, () => 0);
-	for (const player of players.values()) {
-		if (player.team !== undefined) {
-			teamSizes[player.team]++;
-		}
-	}
-
-	let smallestTeam = 0;
-	for (let i = 1; i < teamCount; i++) {
-		if (teamSizes[i] < teamSizes[smallestTeam]) {
-			smallestTeam = i;
-		}
-	}
-
-	return smallestTeam;
-};
-
+// Touch Interaction Handlers
 const addPlayer = (id, x, y) => {
-	const player = { x, y, color: teamMode ? 0 : pickUnusedColor() };
+	sfx.touch();
+	if (navigator.vibrate) navigator.vibrate(30);
+
+	const player = {
+		x,
+		y,
+		color: teamMode ? 0 : pickUnusedColor(),
+		spawnTime: Date.now(),
+	};
 	players.set(id, player);
 	draw();
-	ariaLiveLog(`Player ${id} added`);
+	ariaLiveLog(`Finger added. Total: ${players.size}`);
 };
 
 const updatePlayer = (id, x, y) => {
@@ -186,74 +301,83 @@ const updatePlayer = (id, x, y) => {
 const removePlayer = (id) => {
 	players.delete(id);
 	draw();
-	ariaLiveLog(`Player ${id} removed`);
+	ariaLiveLog(`Finger removed. Remaining: ${players.size}`);
 };
 
 const assignTeamsToPlayers = () => {
 	const playerIds = Array.from(players.keys());
 	const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
-	
+
 	teams.clear();
 	for (let i = 0; i < teamCount; i++) {
 		teams.set(i, []);
 	}
-	
+
 	shuffled.forEach((playerId, index) => {
 		const teamIndex = index % teamCount;
 		const player = players.get(playerId);
-		player.team = teamIndex;
-		player.color = teamIndex;
-		teams.get(teamIndex).push(playerId);
+		if (player) {
+			player.team = teamIndex;
+			player.color = teamIndex;
+			teams.get(teamIndex).push(playerId);
+		}
 	});
-	
+
 	teamsAssigned = true;
+	sfx.team();
+	if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
 	draw();
-	
+
 	for (let i = 0; i < teamCount; i++) {
-		const teamPlayers = teams.get(i);
-		if (teamPlayers.length > 0) {
-			ariaLiveLog(`Team ${i + 1}: ${teamPlayers.length} players`);
+		const count = teams.get(i).length;
+		if (count > 0) {
+			ariaLiveLog(`Team ${i + 1}: ${count} players`);
 		}
 	}
 };
 
-const choosePlayer = (function () {
-	const choosePlayer = () => {
+const choosePlayer = (() => {
+	const pick = () => {
 		if (players.size < MIN_PLAYERS) return;
-		
+
 		if (teamMode) {
 			assignTeamsToPlayers();
 			return;
 		}
 
-		const choosen = Math.floor(Math.random() * players.size);
-		chosenPlayer = Array.from(players.keys())[choosen];
+		const keys = Array.from(players.keys());
+		const chosen = keys[Math.floor(Math.random() * keys.length)];
+		chosenPlayerId = chosen;
 
-		const player = players.get(chosenPlayer);
-		chosenPlayerAnimation.startTime = Date.now();
-		chosenPlayerAnimation.startValue = Math.max(
-			player.x,
-			canvas.width - player.x,
-			player.y,
-			canvas.height - player.y
+		const player = players.get(chosenPlayerId);
+		chosenAnimation.startTime = Date.now();
+		const px = player.x * dpr;
+		const py = player.y * dpr;
+
+		chosenAnimation.startRadius = Math.hypot(
+			Math.max(px, canvas.width - px),
+			Math.max(py, canvas.height - py)
 		);
 
+		sfx.win();
+		if (navigator.vibrate) navigator.vibrate([100, 50, 200]);
+
 		draw();
-		ariaLiveLog(`Player ${chosenPlayer} chosen`);
+		ariaLiveLog(`Winner selected!`);
 	};
 
 	let timeout;
 	return () => {
 		window.clearTimeout(timeout);
-		if (chosenPlayer === undefined && players.size >= MIN_PLAYERS) {
-			timeout = window.setTimeout(choosePlayer, CHOOSE_DELAY_MS);
+		if (chosenPlayerId === undefined && !teamsAssigned && players.size >= MIN_PLAYERS) {
+			timeout = window.setTimeout(pick, CHOOSE_DELAY_MS);
 		}
 	};
 })();
 
-const reset = (function () {
-	const reset = () => {
-		chosenPlayer = undefined;
+const reset = (() => {
+	const doReset = () => {
+		chosenPlayerId = undefined;
 		teamsAssigned = false;
 		players.clear();
 		teams.clear();
@@ -264,89 +388,47 @@ const reset = (function () {
 	let timeout;
 	return () => {
 		window.clearTimeout(timeout);
-		timeout = window.setTimeout(reset, RESET_DELAY_MS);
+		timeout = window.setTimeout(doReset, RESET_DELAY_MS);
 	};
 })();
 
+// Pointer Events
 document.addEventListener("pointerdown", (e) => {
-	if (e.target.closest('#controls')) return;
+	if (e.target.closest("#controls")) return;
 	addPlayer(e.pointerId, e.clientX, e.clientY);
 	choosePlayer();
 });
+
 document.addEventListener("pointermove", (e) => {
 	updatePlayer(e.pointerId, e.clientX, e.clientY);
 });
+
 const onPointerRemove = (e) => {
-	if (chosenPlayer === e.pointerId || (teamMode && teamsAssigned)) {
+	if (chosenPlayerId === e.pointerId || (teamMode && teamsAssigned)) {
 		reset();
 	} else {
 		removePlayer(e.pointerId);
 		choosePlayer();
 	}
 };
+
 document.addEventListener("pointerup", onPointerRemove);
 document.addEventListener("pointercancel", onPointerRemove);
 
-// Prevent page from scrolling.
-// Chrome on Android immediately cancels pointer events if the page starts to
-// scroll up or down. Because of Chrome's hiding url bar, the page does actually
-// scroll, even though the page content is not enough to cause scroll bars.
-// Calling preventDefault on all touchmove events helps here, but feels like a
-// hack. Would be nice to find a better solution.
-document.addEventListener(
-	"touchmove",
-	(e) => {
-		e.preventDefault();
-	},
-	{ passive: false }
-);
+// Prevent unwanted default gestures
+document.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-// Prevent double-tap zoom
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (e) => {
-	const now = Date.now();
-	if (now - lastTouchEnd <= 300) {
-		e.preventDefault();
-	}
-	lastTouchEnd = now;
-}, { passive: false });
-
-// Prevent pinch zoom
-document.addEventListener('gesturestart', (e) => e.preventDefault());
-document.addEventListener('gesturechange', (e) => e.preventDefault());
-document.addEventListener('gestureend', (e) => e.preventDefault());
-
-// Prevent context menu
-document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-if ("serviceWorker" in navigator && location.hostname !== "localhost") {
-	window.addEventListener("load", () => {
-		navigator.serviceWorker.register("/chooser/src/sw.js").catch((err) => {
-			console.warn("ServiceWorker registration failed: ", err);
-		});
-	});
-	navigator.serviceWorker.addEventListener("controllerchange", () => {
-		updateAvailable.hidden = false;
-	});
-	navigator.serviceWorker.addEventListener("message", (e) => {
-		if (e.data.version) {
-			version.textContent = e.data.version;
-		}
-	});
-	navigator.serviceWorker.ready.then((sw) => {
-		sw.active.postMessage("version");
-	});
-}
-
+// UI Control Updates
 const updateTeamModeUI = () => {
 	if (teamMode) {
-		teamModeToggle.classList.add('active');
-		teamCountLabel.classList.add('visible');
-		description.textContent = `Team Mode: After 2 seconds, players will be randomly assigned to ${teamCount} teams.`;
+		teamModeToggle.classList.add("active");
+		teamCountLabel.classList.add("visible");
+		description.textContent = `Hold fingers down to divide into ${teamCount} teams.`;
 	} else {
-		teamModeToggle.classList.remove('active');
-		teamCountLabel.classList.remove('visible');
-		description.textContent = `Make all players put one finger on the screen. After 2 seconds one player is chosen at random.`;
+		teamModeToggle.classList.remove("active");
+		teamCountLabel.classList.remove("visible");
+		description.textContent = `Place 2 or more fingers on the screen to choose a winner.`;
 	}
 };
 
@@ -354,27 +436,52 @@ const updateTeamCount = () => {
 	teamCountSpan.textContent = teamCount;
 	teamMinusBtn.disabled = teamCount <= 2;
 	teamPlusBtn.disabled = teamCount >= 8;
+	if (teamMode) {
+		description.textContent = `Hold fingers down to divide into ${teamCount} teams.`;
+	}
 };
 
-teamModeToggle.addEventListener('click', () => {
+teamModeToggle.addEventListener("click", () => {
 	teamMode = !teamMode;
 	updateTeamModeUI();
 	reset();
 });
 
-teamMinusBtn.addEventListener('click', () => {
+teamMinusBtn.addEventListener("click", () => {
 	if (teamCount > 2) {
 		teamCount--;
 		updateTeamCount();
 	}
 });
 
-teamPlusBtn.addEventListener('click', () => {
+teamPlusBtn.addEventListener("click", () => {
 	if (teamCount < 8) {
 		teamCount++;
 		updateTeamCount();
 	}
 });
 
+// Service Worker Integration
+if ("serviceWorker" in navigator && location.hostname !== "localhost") {
+	window.addEventListener("load", () => {
+		navigator.serviceWorker.register("./sw.js").catch((err) => {
+			console.warn("ServiceWorker registration failed: ", err);
+		});
+	});
+	navigator.serviceWorker.addEventListener("controllerchange", () => {
+		updateAvailable.hidden = false;
+	});
+	navigator.serviceWorker.addEventListener("message", (e) => {
+		if (e.data && e.data.version) {
+			version.textContent = `v${e.data.version}`;
+		}
+	});
+	navigator.serviceWorker.ready.then((sw) => {
+		sw.active?.postMessage("version");
+	});
+}
+
+// Initial Boot
+resizeCanvas();
 updateTeamModeUI();
 updateTeamCount();
