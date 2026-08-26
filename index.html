@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lytemont Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <div class="bg-glow"></div>
+
+  <main class="container">
+    <header class="hub-header">
+      <div class="avatar-badge">
+        <span class="avatar-icon">⚡</span>
+      </div>
+      <h1>Lytemont Hub</h1>
+      <p class="tagline">Select an interactive tool to launch</p>
+    </header>
+
+    <div class="cards-grid">
+      <!-- Player Chooser Card -->
+      <a href="./chooser/" class="tool-card chooser-card">
+        <div class="card-glow"></div>
+        <div class="card-content">
+          <div class="card-top">
+            <div class="icon-wrap chooser-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <span class="status-pill">Interactive</span>
+          </div>
+
+          <div class="card-info">
+            <h2>Player Chooser</h2>
+            <p>Pick random players with multi-touch fingers or click inputs for quick decision making.</p>
+          </div>
+
+          <div class="card-footer">
+            <span class="action-text">Launch tool</span>
+            <span class="arrow-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Coin Flipper Card -->
+      <a href="./coinflipper/" class="tool-card flipper-card">
+        <div class="card-glow"></div>
+        <div class="card-content">
+          <div class="card-top">
+            <div class="icon-wrap flipper-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 12h8"/></svg>
+            </div>
+            <span class="status-pill">3D Physics</span>
+          </div>
+
+          <div class="card-info">
+            <h2>Coin Flipper</h2>
+            <p>Simulate realistic 3D coin flips with custom sound effects, keyboard shortcuts, and statistics.</p>
+          </div>
+
+          <div class="card-footer">
+            <span class="action-text">Launch tool</span>
+            <span class="arrow-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <footer class="hub-footer">
+      <span>Hosted on GitHub Pages</span>
+    </footer>
+  </main>
+</body>
+</html>
