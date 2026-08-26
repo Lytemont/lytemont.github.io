@@ -68,7 +68,7 @@ class SoundFX {
 		this.init();
 		if (!this.ctx) return;
 		const now = this.ctx.currentTime;
-		const chords = [523.25, 659.25, 783.99, 1046.5]; // C Major
+		const chords = [523.25, 659.25, 783.99, 1046.5];
 		chords.forEach((freq, idx) => {
 			const osc = this.ctx.createOscillator();
 			const gain = this.ctx.createGain();
@@ -130,14 +130,14 @@ const getIndividualColor = (index, alpha = 1) =>
 	`hsla(${(index * 137.5 + 340) % 360}, 95%, 58%, ${alpha})`;
 
 const teamPalette = [
-	{ hue: 345, hex: "#ff2a6d" }, // Neon Red/Pink
-	{ hue: 195, hex: "#05d9e8" }, // Neon Cyan
-	{ hue: 145, hex: "#00ff87" }, // Emerald Neon
-	{ hue: 45,  hex: "#ffb800" }, // Amber Glow
-	{ hue: 275, hex: "#b537f2" }, // Violet Glow
-	{ hue: 25,  hex: "#ff6c00" }, // Orange
-	{ hue: 170, hex: "#00f0b5" }, // Mint Teal
-	{ hue: 315, hex: "#ff00a0" }, // Magenta
+	{ hue: 345, hex: "#ff2a6d" },
+	{ hue: 195, hex: "#05d9e8" },
+	{ hue: 145, hex: "#00ff87" },
+	{ hue: 45,  hex: "#ffb800" },
+	{ hue: 275, hex: "#b537f2" },
+	{ hue: 25,  hex: "#ff6c00" },
+	{ hue: 170, hex: "#00f0b5" },
+	{ hue: 315, hex: "#ff00a0" },
 ];
 
 const getTeamColor = (teamIndex, alpha = 1) => {
@@ -175,10 +175,8 @@ const drawPlayer = (player) => {
 		? getTeamColor(player.color, 1)
 		: getIndividualColor(player.color, 1);
 
-	// Outer ambient glow
 	drawPlayerGlow(px, py, 60 * dpr, mainColor, 0.45);
 
-	// Outer Pulse Ring
 	const now = Date.now();
 	const pulse = (Math.sin((now - player.spawnTime) / 200) + 1) / 2;
 	const outerRadius = (52 + pulse * 6) * dpr;
@@ -189,19 +187,16 @@ const drawPlayer = (player) => {
 	ctx.arc(px, py, outerRadius, 0, 2 * Math.PI);
 	ctx.stroke();
 
-	// Inner Disc
 	ctx.beginPath();
 	ctx.fillStyle = mainColor;
 	ctx.arc(px, py, 38 * dpr, 0, 2 * Math.PI);
 	ctx.fill();
 
-	// Inner Core Accent
 	ctx.beginPath();
 	ctx.fillStyle = "#ffffff";
 	ctx.arc(px, py, 14 * dpr, 0, 2 * Math.PI);
 	ctx.fill();
 
-	// Team Identifier Number inside the disc
 	if (teamMode && teamsAssigned && player.team !== undefined) {
 		ctx.fillStyle = "#000000";
 		ctx.font = `800 ${22 * dpr}px 'Plus Jakarta Sans', sans-serif`;
@@ -233,7 +228,6 @@ const draw = (() => {
 					? getTeamColor(player.color, 1)
 					: getIndividualColor(player.color, 1);
 
-				// Winning reveal mask
 				ctx.beginPath();
 				ctx.fillStyle = winColor;
 				ctx.rect(0, 0, canvas.width, canvas.height);
@@ -250,7 +244,7 @@ const draw = (() => {
 			for (const player of players.values()) {
 				drawPlayer(player);
 			}
-			return true; // Keep loop active for smooth pulse animations
+			return true;
 		} else {
 			instructionCard.classList.remove("hidden");
 			return false;
@@ -415,11 +409,11 @@ const onPointerRemove = (e) => {
 document.addEventListener("pointerup", onPointerRemove);
 document.addEventListener("pointercancel", onPointerRemove);
 
-// Prevent unwanted default gestures
+// Gesture prevention
 document.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-// UI Control Updates
+// UI Controls
 const updateTeamModeUI = () => {
 	if (teamMode) {
 		teamModeToggle.classList.add("active");
@@ -460,26 +454,6 @@ teamPlusBtn.addEventListener("click", () => {
 		updateTeamCount();
 	}
 });
-
-// Service Worker Integration
-if ("serviceWorker" in navigator && location.hostname !== "localhost") {
-	window.addEventListener("load", () => {
-		navigator.serviceWorker.register("./sw.js").catch((err) => {
-			console.warn("ServiceWorker registration failed: ", err);
-		});
-	});
-	navigator.serviceWorker.addEventListener("controllerchange", () => {
-		updateAvailable.hidden = false;
-	});
-	navigator.serviceWorker.addEventListener("message", (e) => {
-		if (e.data && e.data.version) {
-			version.textContent = `v${e.data.version}`;
-		}
-	});
-	navigator.serviceWorker.ready.then((sw) => {
-		sw.active?.postMessage("version");
-	});
-}
 
 // Initial Boot
 resizeCanvas();
