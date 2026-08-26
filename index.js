@@ -1,6 +1,6 @@
 const MIN_PLAYERS = 2;
-const CHOOSE_DELAY_MS = 2200;
-const RESET_DELAY_MS = 1000;
+const CHOOSE_DELAY_MS = 3000;
+const RESET_DELAY_MS = 2000;
 
 // DOM Elements
 const canvas = document.getElementById("board");
